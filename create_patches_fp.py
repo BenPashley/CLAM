@@ -2,6 +2,10 @@
 from wsi_core.WholeSlideImage import WholeSlideImage
 from wsi_core.wsi_utils import StitchCoords
 from wsi_core.batch_process_utils import initialize_df
+
+import h5py
+import cv2
+
 # other imports
 import os
 import numpy as np
@@ -44,7 +48,7 @@ def patching(WSI_object, **kwargs):
 	return file_path, patch_time_elapsed
 
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, tissue_contours_save_dir,
 				  patch_size = 256, step_size = 256, 
 				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
 				  'keep_ids': 'none', 'exclude_ids': 'none'},
@@ -174,10 +178,10 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 			current_seg_params['exclude_ids'] = []
 
 		w, h = WSI_object.level_dim[current_seg_params['seg_level']] 
-		if w * h > 1e8:
-			print('level_dim {} x {} is likely too large for successful segmentation, aborting'.format(w, h))
-			df.loc[idx, 'status'] = 'failed_seg'
-			continue
+		# if w * h > 1e8:
+		# 	print('level_dim {} x {} is likely too large for successful segmentation, aborting'.format(w, h))
+		# 	df.loc[idx, 'status'] = 'failed_seg'
+		# 	continue
 
 		df.loc[idx, 'vis_level'] = current_vis_params['vis_level']
 		df.loc[idx, 'seg_level'] = current_seg_params['seg_level']
@@ -185,9 +189,144 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		seg_time_elapsed = -1
 		if seg:
-			WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params) 
+            # we are going to seg using all of the provided presets, then selecting the segmentation that results in
+            # the maximum number of contours with the smallest total area. If we have ties, we pick the first.
+            # We also set a hard cutoff for maximum number of contours.
+
+			print('Generating scores for {}, scores close to 0 indicate a strong match, 1 indicates failure.'.format(WSI_object.name))
+            
+			contour_cutoff = 10
+			optim_list = []
+			contours_list = []
+			contour_counter = []
+			contour_pixel_counter = []
+			tumor_contours_list = []
+			holes_list = []
+			for preset in os.listdir('presets'):
+				preset_df = pd.read_csv(os.path.join('presets', preset))
+
+				for key in current_seg_params.keys():
+					current_seg_params[key] = preset_df.loc[0, key]
+					if (key == 'keep_ids') or (key == 'exclude_ids'):
+						if preset_df.loc[0, key] == 'none':
+							current_seg_params[key] = []
+
+				for key in current_filter_params.keys():
+					current_filter_params[key] = preset_df.loc[0, key]
+
+				current_seg_params['seg_level'] = current_vis_params['vis_level']
+				WSI_object_pass, seg_time_elapsed_pass = segment(WSI_object, current_seg_params, current_filter_params)
+
+				if seg_time_elapsed_pass != -1:
+					if seg_time_elapsed == -1:
+						seg_time_elapsed += seg_time_elapsed_pass + 1
+					else:
+						seg_time_elapsed += seg_time_elapsed_pass
+
+				contours_list.append(WSI_object_pass.contours_tissue.copy())
+				holes_list.append(WSI_object_pass.holes_tissue.copy())
+				tumor_contours_list.append([])
+
+				if (len(WSI_object_pass.contours_tissue) == 0) or (len(WSI_object_pass.contours_tissue) > contour_cutoff):
+					optim_list.append(1)
+					optim_print = 1
+					contour_counter.append(len(WSI_object_pass.contours_tissue))
+					if (len(WSI_object_pass.contours_tissue) == 0):
+						contour_pixel_counter.append(0)
+					else:
+						contour_pixels = 0
+						for contours in WSI_object_pass.contours_tissue:
+							contour_pixels += cv2.contourArea(contours)
+						contour_pixel_counter.append(contour_pixels)
+
+				else:
+					contour_pixels = 0
+					optim_mult = 1/len(WSI_object_pass.contours_tissue)
+					contour_counter.append(len(WSI_object_pass.contours_tissue))
+					for contours in WSI_object_pass.contours_tissue:
+						contour_pixels += cv2.contourArea(contours)
+					contour_pixel_counter.append(contour_pixels)
+					optim_score = contour_pixels / (WSI_object_pass.level_dim[0][0] * WSI_object_pass.level_dim[0][1])
+					optim_list.append((optim_mult + optim_score) / 2)
+					optim_print = (optim_mult + optim_score) / 2
+
+				print('{} pass completed, optim score: {}'.format(preset, optim_print))
+
+			if np.all(np.array(optim_list) > 0.9):
+				print('WARNING: {} appears to have no ideal configuration for tissue seg. '
+						'Check slide quality. Taking seg with most contours...'.format(WSI_object_pass.name))
+				# pass the run with the most contours
+				winner = np.argmax(np.array(contour_counter))
+				df.loc[idx, 'status'] = 'failed_seg'
+
+			else:
+				# get the ids of the two smallest scored masks
+				idx_small = np.argpartition(np.array(optim_list), 2)
+				if (optim_list[idx_small[1]] - optim_list[idx_small[0]]) < 0.05:
+					# the scores are close, we pick the one with the largest total area
+					print('{} and {} are close, we pick the one with the largest total area.'.format(
+					os.listdir('presets')[idx_small[0]],
+					os.listdir('presets')[idx_small[1]]))
+					id0_pixels_score = contour_pixel_counter[idx_small[0]] / (WSI_object_pass.level_dim[0][0] * WSI_object_pass.level_dim[0][1])
+					id1_pixels_score = contour_pixel_counter[idx_small[1]] / (WSI_object_pass.level_dim[0][0] * WSI_object_pass.level_dim[0][1])
+					id0_score = (1 - id0_pixels_score)
+					id1_score = (1 - id1_pixels_score)
+					if id0_score < id1_score:
+						winner = idx_small[0]
+					else:
+						winner = idx_small[1]
+				else:
+					winner = np.argmin(np.array(optim_list))
+				print('Passes complete, {} provided the best results'.format(
+					os.listdir('presets')[winner]))
+				df.loc[idx, 'status'] = 'processed'
+
+			# update the contours
+			WSI_object.contours_tissue = contours_list[winner]
+			WSI_object.holes_tissue = holes_list[winner]
+			WSI_object.contours_tumor = tumor_contours_list[winner]
+
+			# save the contours
+			tissue_contours_path = os.path.join(tissue_contours_save_dir, slide_id + '.h5')
+			hf = h5py.File(tissue_contours_path, 'w')
+			if len(contours_list[winner]) == 0:
+				hf.create_dataset('tissue_contours_null', data=np.array([]))
+			else:
+				for c_id, contour_sample in enumerate(contours_list[winner]):
+					hf.create_dataset('tissue_contours_{}'.format(c_id), data=contour_sample)
+			if len(holes_list[winner]) == 0:
+				hf.create_dataset('holes_contours_null', data=np.array([]))
+			else:
+				for h_id, holes_sample in enumerate(holes_list[winner]):
+					# weird things going on with holes, inconsistent data structure
+					if holes_sample == []:
+						hf.create_dataset('holes_contours_null_{}'.format(h_id), data=np.array(holes_sample))
+					elif len(holes_sample) == 1:
+						hf.create_dataset('holes_contours_{}'.format(h_id), data=holes_sample[0])
+					else:
+						for hsub_id, holes_sub_sample in enumerate(holes_sample):
+							hf.create_dataset('holes_contours_{}_{}'.format(h_id, hsub_id), data=holes_sub_sample)
+			hf.close()
+
+			# update params
+			preset_df = pd.read_csv(os.path.join('presets', os.listdir('presets')[winner]))
+
+			for key in current_seg_params.keys():
+				df.loc[idx, key] = preset_df.loc[0, key]
+
+			for key in current_filter_params.keys():
+				df.loc[idx, key] = preset_df.loc[0, key]
+
+			for key in current_vis_params.keys():
+				current_vis_params[key] = preset_df.loc[0, key]
+				df.loc[idx, key] = preset_df.loc[0, key]
+
+			for key in current_patch_params.keys():
+				current_patch_params[key] = preset_df.loc[0, key]
+				df.loc[idx, key] = preset_df.loc[0, key]
 
 		if save_mask:
+			current_vis_params['vis_level'] = 0
 			mask = WSI_object.visWSI(**current_vis_params)
 			mask_path = os.path.join(mask_save_dir, slide_id+'.jpg')
 			mask.save(mask_path)
@@ -252,6 +391,7 @@ if __name__ == '__main__':
 	patch_save_dir = os.path.join(args.save_dir, 'patches')
 	mask_save_dir = os.path.join(args.save_dir, 'masks')
 	stitch_save_dir = os.path.join(args.save_dir, 'stitches')
+	tissue_contours_save_dir = os.path.join(args.save_dir, 'tissue_contours')
 
 	if args.process_list:
 		process_list = os.path.join(args.save_dir, args.process_list)
@@ -263,12 +403,14 @@ if __name__ == '__main__':
 	print('patch_save_dir: ', patch_save_dir)
 	print('mask_save_dir: ', mask_save_dir)
 	print('stitch_save_dir: ', stitch_save_dir)
+	print('tissue_contours_save_dir:', tissue_contours_save_dir)
 	
 	directories = {'source': args.source, 
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
-				   'stitch_save_dir': stitch_save_dir} 
+				   'stitch_save_dir': stitch_save_dir,
+       				'tissue_contours_save_dir': tissue_contours_save_dir} 
 
 	for key, val in directories.items():
 		print("{} : {}".format(key, val))
