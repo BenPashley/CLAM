@@ -29,7 +29,10 @@ def segment(WSI_object, seg_params = None, filter_params = None, mask_file = Non
 		WSI_object.initSegmentation(mask_file)
 	# Segment	
 	else:
+		# try:
 		WSI_object.segmentTissue(**seg_params, filter_params=filter_params)
+		# except:
+		# 	return WSI_object, -1
 
 	### Stop Seg Timers
 	seg_time_elapsed = time.time() - start_time   
@@ -151,9 +154,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 			
 			else:	
 				wsi = WSI_object.getOpenSlide()
-				# best_level = wsi.get_best_level_for_downsample(64)
-				# current_vis_params['vis_level'] = best_level		
-				best_level = - 1
+				best_level = wsi.get_best_level_for_downsample(64)
 				current_vis_params['vis_level'] = best_level
 
 		if current_seg_params['seg_level'] < 0:
@@ -162,9 +163,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 			
 			else:
 				wsi = WSI_object.getOpenSlide()
-				# best_level = wsi.get_best_level_for_downsample(64)
-				# current_seg_params['seg_level'] = best_level
-				best_level = - 1
+				best_level = wsi.get_best_level_for_downsample(64)
 				current_seg_params['seg_level'] = best_level
 
 		keep_ids = str(current_seg_params['keep_ids'])
@@ -219,6 +218,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 					current_filter_params[key] = preset_df.loc[0, key]
 
 				current_seg_params['seg_level'] = current_vis_params['vis_level']
+    
 				WSI_object_pass, seg_time_elapsed_pass = segment(WSI_object, current_seg_params, current_filter_params)
 
 				if seg_time_elapsed_pass != -1:
