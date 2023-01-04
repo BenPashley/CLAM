@@ -62,7 +62,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 				  use_default_params = False, 
 				  seg = False, save_mask = True, 
 				  stitch= False, 
-				  patch = False, auto_skip=True, process_list = None):
+				  patch = False, auto_skip=True, auto_skip_mask=False, process_list = None):
 	
 
 
@@ -103,7 +103,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		df.loc[idx, 'process'] = 0
 		slide_id, _ = os.path.splitext(slide)
 
-		if auto_skip and os.path.isfile(os.path.join(patch_save_dir, slide_id + '.h5')):
+		if auto_skip and (auto_skip_mask and os.path.isfile(os.path.join(mask_save_dir, slide_id + '.jpg'))) or (not auto_skip_mask and os.path.isfile(os.path.join(mask_save_dir, slide_id + '.jpg'))):
 			print('{} already exist in destination location, skipped'.format(slide_id))
 			df.loc[idx, 'status'] = 'already_exist'
 			continue
@@ -357,7 +357,7 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 		seg_times += seg_time_elapsed
 		patch_times += patch_time_elapsed
 		stitch_times += stitch_time_elapsed
-
+	
 	seg_times /= total
 	patch_times /= total
 	stitch_times /= total
@@ -380,6 +380,7 @@ parser.add_argument('--patch', default=False, action='store_true')
 parser.add_argument('--seg', default=False, action='store_true')
 parser.add_argument('--stitch', default=False, action='store_true')
 parser.add_argument('--no_auto_skip', default=True, action='store_false')
+parser.add_argument('--auto_skip_mask', default=False, action='store_true')
 parser.add_argument('--save_dir', type = str,
 					help='directory to save processed data')
 parser.add_argument('--preset', default=None, type=str,
@@ -453,4 +454,4 @@ if __name__ == '__main__':
 											seg = args.seg,  use_default_params=False, save_mask = True, 
 											stitch= args.stitch,
 											patch_level=args.patch_level, patch = args.patch,
-											process_list = process_list, auto_skip=args.no_auto_skip)
+											process_list = process_list, auto_skip=args.no_auto_skip, auto_skip_mask=args.auto_skip_mask)
