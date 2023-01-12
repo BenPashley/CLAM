@@ -9,7 +9,7 @@ import math
 from utils.file_utils import save_pkl, load_pkl
 from utils.utils import *
 from utils.core_utils import train
-from datasetss.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset
+from datasets.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset
 
 # pytorch imports
 import torch
@@ -85,6 +85,8 @@ parser.add_argument('--results_dir', default='./results', help='results director
 parser.add_argument('--split_dir', type=str, default=None, 
                     help='manually specify the set of splits to use, ' 
                     +'instead of infering from the task and label_frac argument (default: None)')
+parser.add_argument('--manifest_dir', type=str, default=None, 
+                    help='manually specify the set of manifests to use, ')
 parser.add_argument('--log_data', default=True, help='log data using tensorboard')
 parser.add_argument('--testing', action='store_true', default=False, help='debugging tool')
 parser.add_argument('--early_stopping',  default=False, help='enable early stopping')
@@ -98,7 +100,7 @@ parser.add_argument('--model_type', type=str, choices=['clam_sb', 'clam_mb', 'mi
 parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
 parser.add_argument('--weighted_sample',  default=False, help='enable weighted sampling')
 parser.add_argument('--model_size', type=str, choices=['small', 'big'], default='small', help='size of model, does not affect mil')
-parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping', 'task_1_up_normal_vs_suspect','task_2_up_type','task_3_up_subtype','task_4_up_ta_subtype_grading','task_5_up_tva_subtype_grading'])
+parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping', 'task_1_up_normal_vs_suspect','task_2_up_type','task_3_up_subtype','task_4_up_ta_subtype_grading','task_5_up_tva_subtype_grading','task_6_up_histo_grading'])
 ### CLAM specific options
 parser.add_argument('--no_inst_cluster', action='store_true', default=False,
                      help='disable instance-level clustering')
@@ -109,6 +111,7 @@ parser.add_argument('--subtyping', default=False,
 parser.add_argument('--bag_weight', type=float, default=0.7,
                     help='clam: weight coefficient for bag-level loss (default: 0.7)')
 parser.add_argument('--B', type=int, default=8, help='numbr of positive/negative patches to sample for clam')
+
 args = parser.parse_args()
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -179,8 +182,8 @@ elif args.task == 'task_2_tumor_subtyping':
 
 elif args.task == 'task_1_up_normal_vs_suspect':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = f'{args.processing_path}/normal_vs_suspect.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'FEATURES','NORMAL_VS_SUSPECT'),
+    dataset = Generic_MIL_Dataset(csv_path = f'{args.manifest_dir}/normal_vs_suspect.csv',
+                            data_dir= os.path.join(args.data_root_dir),
                             shuffle = False, 
                             print_info = True,
                             label_dict = {'NORMAL':0, 'SUSPECT':1},
@@ -188,8 +191,8 @@ elif args.task == 'task_1_up_normal_vs_suspect':
                             ignore=[])
 elif args.task == 'task_2_up_type':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = f'{args.processing_path}/type.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'FEATURES','TYPE'),
+    dataset = Generic_MIL_Dataset(csv_path = f'{args.manifest_dir}/type.csv',
+                            data_dir= os.path.join(args.data_root_dir),
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -198,8 +201,8 @@ elif args.task == 'task_2_up_type':
                             ignore=[])
 elif args.task == 'task_3_up_subtype':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = f'{args.processing_path}/CLAM/MANIFEST/subtype.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'FEATURES','SUBTYPE'),
+    dataset = Generic_MIL_Dataset(csv_path = f'{args.manifest_dir}/subtype.csv',
+                            data_dir= os.path.join(args.data_root_dir),
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -209,8 +212,8 @@ elif args.task == 'task_3_up_subtype':
 
 elif args.task == 'task_4_up_ta_subtype_grading':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = f'{args.processing_path}/ta_subtype_grading.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'FEATURES','TA_SUBTYPE_GRADING'),
+    dataset = Generic_MIL_Dataset(csv_path = f'{args.manifest_dir}/ta_subtype_grading.csv',
+                            data_dir= os.path.join(args.data_root_dir),
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -220,8 +223,8 @@ elif args.task == 'task_4_up_ta_subtype_grading':
 
 elif args.task == 'task_5_up_tva_subtype_grading':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path =f'{args.processing_path}/tva_subtype_grading.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'FEATURES','TVA_SUBTYPE_GRADING'),
+    dataset = Generic_MIL_Dataset(csv_path =f'{args.manifest_dir}/tva_subtype_grading.csv',
+                            data_dir= os.path.join(args.data_root_dir),
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -231,7 +234,19 @@ elif args.task == 'task_5_up_tva_subtype_grading':
 
     if args.model_type in ['clam_sb', 'clam_mb']:
         assert args.subtyping 
-        
+elif args.task == 'task_6_up_histo_grading':
+    args.n_classes=6
+    dataset = Generic_MIL_Dataset(csv_path =f'{args.manifest_dir}/histo_grading.csv',
+                            data_dir= os.path.join(args.data_root_dir),
+                            shuffle = False, 
+                            seed = args.seed, 
+                            print_info = True,
+                            label_dict = {'NORM':0,'HP':1,'TA.LG':2,'TA.HG':3,'TVA.LG':4,'TVA.HG':5},
+                            patient_strat= True,
+                            ignore=[])
+
+    if args.model_type in ['clam_sb', 'clam_mb']:
+        assert args.subtyping         
 else:
     raise NotImplementedError
     

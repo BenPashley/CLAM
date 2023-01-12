@@ -270,7 +270,7 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     if inst_count > 0:
         train_inst_loss /= inst_count
         print('\n')
-        for i in range(2):
+        for i in range(n_classes):
             acc, correct, count = inst_logger.get_summary(i)
             print('class {} clustering acc {}: correct {}/{}'.format(i, acc, correct, count))
 

@@ -12,35 +12,75 @@ parser.add_argument('--seed', type=int, default=1,
                     help='random seed (default: 1)')
 parser.add_argument('--k', type=int, default=10,
                     help='number of splits (default: 10)')
-parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal', 'task_2_tumor_subtyping'])
+parser.add_argument('--task', type=str, choices=['task_1_up_normal_vs_suspect', 'task_2_up_type', 'task_3_up_subtype', 'task_4_up_ta_subtype_grading', 'task_5_up_tva_subtype_grading', 'task_6_up_histo_grading'])
 parser.add_argument('--val_frac', type=float, default= 0.1,
                     help='fraction of labels for validation (default: 0.1)')
 parser.add_argument('--test_frac', type=float, default= 0.1,
                     help='fraction of labels for test (default: 0.1)')
+parser.add_argument('--processing_path', type=str,
+                    help='path to process splits from')
 
 args = parser.parse_args()
 
-if args.task == 'task_1_tumor_vs_normal':
+if args.task == 'task_1_up_normal_vs_suspect':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = 'dataset_csv/tumor_vs_normal_dummy_clean.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/normal_vs_suspect.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
-                            label_dict = {'normal_tissue':0, 'tumor_tissue':1},
+                            label_dict = {'NORMAL':0, 'SUSPECT':1},
                             patient_strat=True,
                             ignore=[])
-
-elif args.task == 'task_2_tumor_subtyping':
-    args.n_classes=3
-    dataset = Generic_WSI_Classification_Dataset(csv_path = 'dataset_csv/tumor_subtyping_dummy_clean.csv',
+elif args.task == 'task_2_up_type':
+    args.n_classes=2
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/type.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
-                            label_dict = {'subtype_1':0, 'subtype_2':1, 'subtype_3':2},
+                            label_dict = {'HP':0, 'TA.LG':1,'TA.HG':1,'TVA.LG':1,'TVA.HG':1},
                             patient_strat= True,
                             patient_voting='maj',
                             ignore=[])
-
+elif args.task == 'task_3_up_subtype':
+    args.n_classes=2
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/subtype.csv',
+                            shuffle = False, 
+                            seed = args.seed, 
+                            print_info = True,
+                            label_dict = {'TA.LG':0,'TA.HG':0,'TVA.LG':1,'TVA.HG':1},
+                            patient_strat= True,
+                            patient_voting='maj',
+                            ignore=[])
+elif args.task == 'task_4_up_ta_subtype_grading':
+    args.n_classes=2
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/ta_subtype_grading.csv',
+                            shuffle = False, 
+                            seed = args.seed, 
+                            print_info = True,
+                            label_dict = {'TA.LG':0,'TA.HG':1},
+                            patient_strat= True,
+                            patient_voting='maj',
+                            ignore=[])
+elif args.task == 'task_5_up_tva_subtype_grading':
+    args.n_classes=2
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/tva_subtype_grading.csv',
+                            shuffle = False, 
+                            seed = args.seed, 
+                            print_info = True,
+                            label_dict = {'TVA.LG':0,'TVA.HG':1},
+                            patient_strat= True,
+                            patient_voting='maj',
+                            ignore=[])
+elif args.task == 'task_6_up_histo_grading':
+    args.n_classes=6
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/histo_grading.csv',
+                            shuffle = False, 
+                            seed = args.seed, 
+                            print_info = True,
+                            label_dict = {'NORM':0,'HP':1,'TA.LG':2,'TA.HG':3,'TVA.LG':4,'TVA.HG':5},
+                            patient_strat= True,
+                            patient_voting='maj',
+                            ignore=[])
 else:
     raise NotImplementedError
 
@@ -55,7 +95,7 @@ if __name__ == '__main__':
         label_fracs = [0.1, 0.25, 0.5, 0.75, 1.0]
     
     for lf in label_fracs:
-        split_dir = 'splits/'+ str(args.task) + '_{}'.format(int(lf * 100))
+        split_dir = f'{args.processing_path}/splits/{str(args.task)}' + '_{}'.format(int(lf * 100))
         os.makedirs(split_dir, exist_ok=True)
         dataset.create_splits(k = args.k, val_num = val_num, test_num = test_num, label_frac=lf)
         for i in range(args.k):
