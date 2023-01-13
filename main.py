@@ -20,6 +20,7 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 
+import wandb
 
 def main(args):
     # create results directory if necessary
@@ -90,7 +91,8 @@ parser.add_argument('--manifest_dir', type=str, default=None,
 parser.add_argument('--log_data', default=True, help='log data using tensorboard')
 parser.add_argument('--testing', action='store_true', default=False, help='debugging tool')
 parser.add_argument('--early_stopping',  default=False, help='enable early stopping')
-parser.add_argument('--early_stopping_min_stop_epoch', type=int, default=5, help='early stopping minimum epoch')
+parser.add_argument('--early_stopping_patience', type=int, default=5, help='early stopping minimum epoch')
+parser.add_argument('--early_stopping_minimum_epochs', type=int, default=5, help='early stopping maximum epoch')
 parser.add_argument('--opt', type=str, choices = ['adam', 'sgd'], default='adam')
 parser.add_argument('--drop_out',  default=True, help='enabel dropout (p=0.25)')
 parser.add_argument('--bag_loss', type=str, choices=['svm', 'ce'], default='ce',
@@ -98,6 +100,7 @@ parser.add_argument('--bag_loss', type=str, choices=['svm', 'ce'], default='ce',
 parser.add_argument('--model_type', type=str, choices=['clam_sb', 'clam_mb', 'mil'], default='clam_sb', 
                     help='type of model (default: clam_sb, clam w/ single attention branch)')
 parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
+parser.add_argument('--project_name', type=str, help='project name for wanb')
 parser.add_argument('--weighted_sample',  default=False, help='enable weighted sampling')
 parser.add_argument('--model_size', type=str, choices=['small', 'big'], default='small', help='size of model, does not affect mil')
 parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping', 'task_1_up_normal_vs_suspect','task_2_up_type','task_3_up_subtype','task_4_up_ta_subtype_grading','task_5_up_tva_subtype_grading','task_6_up_histo_grading'])
@@ -114,6 +117,10 @@ parser.add_argument('--B', type=int, default=8, help='numbr of positive/negative
 
 args = parser.parse_args()
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# copy selected args to wandb config
+
+wandb.init(project=args.project_name, config=args)
 
 #python main.py --data_root_dir=/media/ben/2TB/histopathology/CLAM/ --split_dir=/media/ben/2TB/histopathology/CLAM/Split/task_1_up_normal_vs_suspect_90 --task=task_1_up_normal_vs_suspect --B=2 --drop_out=True --log_data=True --weighted_sample=True --early_stopping=True
 #CUDA_VISIBLE_DEVICES=0 python eval.py --drop_out --k 10 --models_exp_code task_1_up_normal_vs_suspect_50_s1 --save_exp_code task_1_up_normal_vs_suspect_50_s1_cv --task task_1_up_normal_vs_suspect --model_type clam_sb --results_dir results --data_root_dir /media/ben/2TB/histopathology/CLAM/Data

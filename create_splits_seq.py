@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 if args.task == 'task_1_up_normal_vs_suspect':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/normal_vs_suspect.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/normal_vs_suspect.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -33,27 +33,27 @@ if args.task == 'task_1_up_normal_vs_suspect':
                             ignore=[])
 elif args.task == 'task_2_up_type':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/type.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/type.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
-                            label_dict = {'HP':0, 'TA.LG':1,'TA.HG':1,'TVA.LG':1,'TVA.HG':1},
+                            label_dict = {'HP':0, 'T':1},
                             patient_strat= True,
                             patient_voting='maj',
                             ignore=[])
 elif args.task == 'task_3_up_subtype':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/subtype.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/subtype.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
-                            label_dict = {'TA.LG':0,'TA.HG':0,'TVA.LG':1,'TVA.HG':1},
+                            label_dict = {'TA':0,'TVA':1},
                             patient_strat= True,
                             patient_voting='maj',
                             ignore=[])
 elif args.task == 'task_4_up_ta_subtype_grading':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/ta_subtype_grading.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/ta_subtype_grading.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -63,7 +63,7 @@ elif args.task == 'task_4_up_ta_subtype_grading':
                             ignore=[])
 elif args.task == 'task_5_up_tva_subtype_grading':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/tva_subtype_grading.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/tva_subtype_grading.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
@@ -73,7 +73,7 @@ elif args.task == 'task_5_up_tva_subtype_grading':
                             ignore=[])
 elif args.task == 'task_6_up_histo_grading':
     args.n_classes=6
-    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/histo_grading.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = f'{args.processing_path}/manifests/histo_grading.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,

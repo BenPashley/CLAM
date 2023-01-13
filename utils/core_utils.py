@@ -97,9 +97,12 @@ def train(datasets, cur, args):
         os.mkdir(writer_dir)
 
     if args.log_data:
-        from tensorboardX import SummaryWriter
-        writer = SummaryWriter(writer_dir, flush_secs=15)
-
+        # from tensorboardX import SummaryWriter
+        # writer = SummaryWriter(writer_dir, flush_secs=15)
+        import wandb
+        # wandb.init(project='colorectal-unitopatho-augmented')
+        writer = wandb
+        writer.config = {'learning_rate':args.lr}
     else:
         writer = None
 
@@ -171,7 +174,7 @@ def train(datasets, cur, args):
 
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
-        early_stopping = EarlyStopping(patience = 20, stop_epoch=50, verbose = True)
+        early_stopping = EarlyStopping(args.early_stopping_patience, stop_epoch=args.early_stopping_minimum_epochs, verbose = True)
 
     else:
         early_stopping = None
@@ -207,14 +210,11 @@ def train(datasets, cur, args):
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
 
         if writer:
-            writer.add_scalar('final/test_class_{}_acc'.format(i), acc, 0)
+            writer.log({f'final/test_class_{i}_acc': acc})
 
     if writer:
-        writer.add_scalar('final/val_error', val_error, 0)
-        writer.add_scalar('final/val_auc', val_auc, 0)
-        writer.add_scalar('final/test_error', test_error, 0)
-        writer.add_scalar('final/test_auc', test_auc, 0)
-        writer.close()
+        writer.log({'final/val_error':val_error, 'final/val_auc':val_auc, 'final/test_error':test_error,'final/test_auc':test_auc})
+        
     return results_dict, test_auc, val_auc, 1-test_error, 1-val_error 
 
 
@@ -279,12 +279,12 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
         acc, correct, count = acc_logger.get_summary(i)
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
         if writer and acc is not None:
-            writer.add_scalar('train/class_{}_acc'.format(i), acc, epoch)
+            writer.log({f'train/class_{i}_acc':acc, 'epoch:':epoch})
 
     if writer:
-        writer.add_scalar('train/loss', train_loss, epoch)
-        writer.add_scalar('train/error', train_error, epoch)
-        writer.add_scalar('train/clustering_loss', train_inst_loss, epoch)
+        writer.log({'train/loss':train_loss, 'train/error':train_error,'train/clustering_loss':train_inst_loss, 'epoch:':epoch})
+        # Optional
+        writer.watch(model)
 
 def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_fn = None):   
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu") 
@@ -325,11 +325,10 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_f
         acc, correct, count = acc_logger.get_summary(i)
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
         if writer:
-            writer.add_scalar('train/class_{}_acc'.format(i), acc, epoch)
+            writer.log({f'train/class_{i}_acc':acc, 'epoch':epoch})
 
     if writer:
-        writer.add_scalar('train/loss', train_loss, epoch)
-        writer.add_scalar('train/error', train_error, epoch)
+        writer.log({'train/loss':train_loss,'train/error':train_error, 'epoch':epoch})
 
    
 def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir=None):
@@ -372,9 +371,7 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
     
     
     if writer:
-        writer.add_scalar('val/loss', val_loss, epoch)
-        writer.add_scalar('val/auc', auc, epoch)
-        writer.add_scalar('val/error', val_error, epoch)
+        writer.log({'val/loss': val_loss, 'val/auc': auc,'val/error': val_error, 'epoch':epoch})
 
     print('\nVal Set, val_loss: {:.4f}, val_error: {:.4f}, auc: {:.4f}'.format(val_loss, val_error, auc))
     for i in range(n_classes):
@@ -458,18 +455,14 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
             print('class {} clustering acc {}: correct {}/{}'.format(i, acc, correct, count))
     
     if writer:
-        writer.add_scalar('val/loss', val_loss, epoch)
-        writer.add_scalar('val/auc', auc, epoch)
-        writer.add_scalar('val/error', val_error, epoch)
-        writer.add_scalar('val/inst_loss', val_inst_loss, epoch)
-
-
+        writer.log({'val/loss': val_loss, 'val/auc': auc,'val/error': val_error,'val/inst_loss':val_inst_loss, 'epoch':epoch})
+        
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
         
         if writer and acc is not None:
-            writer.add_scalar('val/class_{}_acc'.format(i), acc, epoch)
+            writer.log({f'val/class_{i}_acc': acc, 'epoch':epoch})
      
 
     if early_stopping:
