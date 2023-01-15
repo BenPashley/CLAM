@@ -75,14 +75,14 @@ args:
     subtyping: whether it's a subtyping problem
 """
 class CLAM_SB(nn.Module):
-    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+    def __init__(self, gate = True, size_arg = "small", dropout = False, dropout_rate = 0.25, k_sample=8, n_classes=2,
         instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         super(CLAM_SB, self).__init__()
         self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}
         size = self.size_dict[size_arg]
         fc = [nn.Linear(size[0], size[1]), nn.ReLU()]
         if dropout:
-            fc.append(nn.Dropout(0.25))
+            fc.append(nn.Dropout(dropout_rate))
         if gate:
             attention_net = Attn_Net_Gated(L = size[1], D = size[2], dropout = dropout, n_classes = 1)
         else:
@@ -191,7 +191,7 @@ class CLAM_SB(nn.Module):
         return logits, Y_prob, Y_hat, A_raw, results_dict
 
 class CLAM_MB(CLAM_SB):
-    def __init__(self, gate = True, size_arg = "small", dropout = False, k_sample=8, n_classes=2,
+    def __init__(self, gate = True, size_arg = "small", dropout = False, dropout_rate=0.25, k_sample=8, n_classes=2,
         instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False):
         nn.Module.__init__(self)
         self.size_dict = {"small": [1024, 512, 256], "big": [1024, 512, 384]}

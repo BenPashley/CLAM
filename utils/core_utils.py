@@ -96,16 +96,6 @@ def train(datasets, cur, args):
     if not os.path.isdir(writer_dir):
         os.mkdir(writer_dir)
 
-    if args.log_data:
-        # from tensorboardX import SummaryWriter
-        # writer = SummaryWriter(writer_dir, flush_secs=15)
-        import wandb
-        # wandb.init(project='colorectal-unitopatho-augmented')
-        writer = wandb
-        writer.config = {'learning_rate':args.lr}
-    else:
-        writer = None
-
     print('\nInit train/val/test splits...', end=' ')
     train_split, val_split, test_split = datasets
     save_splits(datasets, ['train', 'val', 'test'], os.path.join(args.results_dir, 'splits_{}.csv'.format(cur)))
@@ -113,6 +103,12 @@ def train(datasets, cur, args):
     print("Training on {} samples".format(len(train_split)))
     print("Validating on {} samples".format(len(val_split)))
     print("Testing on {} samples".format(len(test_split)))
+
+    if args.log_data:
+        import wandb
+        writer = wandb
+    else:
+        writer = None
 
     print('\nInit loss function...', end=' ')
     if args.bag_loss == 'svm':
@@ -125,7 +121,7 @@ def train(datasets, cur, args):
     print('Done!')
     
     print('\nInit Model...', end=' ')
-    model_dict = {"dropout": args.drop_out, 'n_classes': args.n_classes}
+    model_dict = {"dropout": args.drop_out, "dropout_rate": args.drop_out_rate, 'n_classes': args.n_classes}
     
     if args.model_size is not None and args.model_type != 'mil':
         model_dict.update({"size_arg": args.model_size})
@@ -174,7 +170,7 @@ def train(datasets, cur, args):
 
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
-        early_stopping = EarlyStopping(args.early_stopping_patience, stop_epoch=args.early_stopping_minimum_epochs, verbose = True)
+        early_stopping = EarlyStopping(patience=5, stop_epoch=10, verbose = True)
 
     else:
         early_stopping = None
@@ -183,6 +179,7 @@ def train(datasets, cur, args):
     for epoch in range(args.max_epochs):
         if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:     
             train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn)
+ 
             stop = validate_clam(cur, epoch, model, val_loader, args.n_classes, 
                 early_stopping, writer, loss_fn, args.results_dir)
         
@@ -251,7 +248,7 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
 
         train_loss += loss_value
         if (batch_idx + 1) % 20 == 0:
-            print('batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(batch_idx, loss_value, instance_loss_value, total_loss.item()) + 
+            print('epoch {}, batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(epoch, batch_idx, loss_value, instance_loss_value, total_loss.item()) + 
                 'label: {}, bag_size: {}'.format(label.item(), data.size(0)))
 
         error = calculate_error(Y_hat, label)
@@ -369,7 +366,6 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
     else:
         auc = roc_auc_score(labels, prob, multi_class='ovr')
     
-    
     if writer:
         writer.log({'val/loss': val_loss, 'val/auc': auc,'val/error': val_error, 'epoch':epoch})
 
@@ -455,6 +451,7 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
             print('class {} clustering acc {}: correct {}/{}'.format(i, acc, correct, count))
     
     if writer:
+        
         writer.log({'val/loss': val_loss, 'val/auc': auc,'val/error': val_error,'val/inst_loss':val_inst_loss, 'epoch':epoch})
         
     for i in range(n_classes):

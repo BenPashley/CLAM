@@ -5,6 +5,8 @@ import pdb
 import os
 import math
 
+import pprint
+
 # internal imports
 from utils.file_utils import save_pkl, load_pkl
 from utils.utils import *
@@ -114,13 +116,14 @@ parser.add_argument('--subtyping', default=False,
 parser.add_argument('--bag_weight', type=float, default=0.7,
                     help='clam: weight coefficient for bag-level loss (default: 0.7)')
 parser.add_argument('--B', type=int, default=8, help='numbr of positive/negative patches to sample for clam')
+# parser.add_argument('--use_wandb', action='store_true', default=True, help='use wandb mlops')
+# parser.add_argument('--use_wandb_sweep', action='store_true', default=False, help='use wandb hyperparameter tuning')
+# parser.add_argument('--wandb_sweep_count', type=int, default=5, help='number of agent iterations')
 
 args = parser.parse_args()
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# copy selected args to wandb config
-
-wandb.init(project=args.project_name, config=args)
+wandb.init(project=args.project_name, config=args, entity="openpatho")
 
 #python main.py --data_root_dir=/media/ben/2TB/histopathology/CLAM/ --split_dir=/media/ben/2TB/histopathology/CLAM/Split/task_1_up_normal_vs_suspect_90 --task=task_1_up_normal_vs_suspect --B=2 --drop_out=True --log_data=True --weighted_sample=True --early_stopping=True
 #CUDA_VISIBLE_DEVICES=0 python eval.py --drop_out --k 10 --models_exp_code task_1_up_normal_vs_suspect_50_s1 --save_exp_code task_1_up_normal_vs_suspect_50_s1_cv --task task_1_up_normal_vs_suspect --model_type clam_sb --results_dir results --data_root_dir /media/ben/2TB/histopathology/CLAM/Data
@@ -140,6 +143,7 @@ def seed_torch(seed=7):
 seed_torch(args.seed)
 
 encoding_size = 1024
+
 settings = {'num_splits': args.k, 
             'k_start': args.k_start,
             'k_end': args.k_end,
@@ -158,10 +162,15 @@ settings = {'num_splits': args.k,
             'weighted_sample': args.weighted_sample,
             'opt': args.opt}
 
+
 if args.model_type in ['clam_sb', 'clam_mb']:
    settings.update({'bag_weight': args.bag_weight,
                     'inst_loss': args.inst_loss,
                     'B': args.B})
+
+settings = wandb.config
+
+pprint (settings)
 
 print('\nLoad Dataset')
 
@@ -284,7 +293,54 @@ for key, val in settings.items():
     print("{}:  {}".format(key, val))        
 
 if __name__ == "__main__":
+
+    # if args.use_wandb:
+    #     # copy selected args to wandb config
+
+    #     wandb.init(project=args.project_name, config=args, entity="openpatho")
+
+        # if (args.use_wandb_sweep):
+            
+        #     settings['model_type'] = wandb.config.model_type
+        #     settings['model_size'] = wandb.config.model_size
+        #     settings['inst_loss'] = wandb.config.inst_loss
+        #     settings['drop_out'] = wandb.config.drop_out
+        #     settings['weighted_sample'] = wandb.config.weighted_sample
+        #     settings['opt'] = wandb.config.opt
+        #     settings['max_epochs'] = wandb.config.max_epochs
+        #     settings['lr'] = wandb.config.lr
+        #     settings['bag_weight'] = wandb.config.bag_weight
+        #     settings['reg'] = wandb.config.reg
+        #     settings['B'] = wandb.config.B            
+            
+            
+            # sweep_configuration = {
+            #     'method': 'random',
+            #     'name': 'sweep',
+            #     'metric': {'goal': 'maximize', 'name': 'val_acc'},
+            #     'early_terminate': {'type': 'hyperband', 'min_iter': 3},
+            #     'parameters': 
+            #         {
+            #         # 'model_type': {'values': ['clam_sb', 'clam_mb']},
+            #         # 'model_size': {'values': ['small', 'large']},
+            #         # 'inst_loss': {'values': ['svm', 'ce', None],
+            #         # 'drop_out': {'values': [True, False]}},
+            #         # 'weighted_sample': {'values': [True, False]},
+            #         # 'opt': {'values': ['adam', 'sgd']},
+            #         # 'max_epochs': {'values': [3]},
+            #         'lr': {'max': 0.1, 'min': 0.0001},
+            #         # 'bag_weight': {'values': [0.1, 0.5, 1.0]},
+            #         # 'reg': {'values': [0.1, 0.5, 1.0]},
+            #         # 'B': {'values': [1, 2, 4, 8, 16]},
+            #         }
+            #     }
+            
+    #         sweep_id = wandb.sweep(sweep=sweep_configuration, project=args.project_name)
+    #         wandb.agent(sweep_id, function=main(args), count=args.wandb_sweep_count)
+   
+    # if (not args.use_wandb_sweep):
     results = main(args)
+    
     print("finished!")
     print("end script")
 
