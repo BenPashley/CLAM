@@ -112,10 +112,19 @@ parser.add_argument('--bag_weight', type=float, default=0.7,
                     help='clam: weight coefficient for bag-level loss (default: 0.7)')
 parser.add_argument('--B', type=int, default=8, help='numbr of positive/negative patches to sample for clam')
 
+import yaml
+# Load the environment specific configuration from a separate YAML file
+with open('environment.yaml', 'r') as f:
+    env_config = yaml.safe_load(f)
+
+print ('processing path', env_config['environment']['processing_dir']['value'][0])
+
 run = wandb.init(project='openpatho-colorectal',  entity="openpatho")
 
 if len(sys.argv) > 1:
     args = parser.parse_args()
+    
+args.processing_dir = env_config['environment']['processing_dir']['value'][0]
 
 settings = {
         'processing_dir': args.processing_dir,

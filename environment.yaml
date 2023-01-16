@@ -1,0 +1,6 @@
+environment:
+  processing_dir:
+    value:
+      - /mnt/e/data/unitopatho/
+
+ 

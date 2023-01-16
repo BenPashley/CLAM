@@ -8,37 +8,31 @@ metric:
 early_terminate:
   type: hyperband
   min_iter: 3
-parameters:
-  early_stopping:
-    values: 
-      - False
+parameters: 
   weighted_sample:
-    value: true
+    value: false
   processing_dir:
     values:
       - /mnt/e/data/unitopatho/
     distribution: categorical
-  project_name:
-    values:
-      - colorectal_unitopatho_augmented
-    distribution: categorical
   model_type:
     values:
-      - clam_sb
-      # - clam_mb
+      # - clam_sb
+      - clam_mb
     distribution: categorical
   inst_loss:
     values:
       - svm
+      # - ce
       # ['svm', 'ce', None]
     distribution: categorical
   model_size:
     values:
-      - small
-      # - big
+      # - small
+      - big
     distribution: categorical
   max_epochs:
-    value: 3
+    value: 4
     distribution: constant
   label_frac:
     value: 0.75
@@ -50,8 +44,6 @@ parameters:
     value: 0.70
   subtyping:
     value: false
-  log_data:
-    value: true
   drop_out:
     value: true
   drop_out_rate:
@@ -63,8 +55,6 @@ parameters:
       # - ce
       - svm
     distribution: categorical
-  testing:
-    value: True
   k:
     value: 1
     distribution: constant
@@ -77,8 +67,8 @@ parameters:
   task:
     values:
       # - task_1_up_normal_vs_suspect
-      - task_2_up_type
-      # - task_3_up_subtype
+      # - task_2_up_type
+      - task_3_up_subtype
       # - task_4_up_ta_subtype_grading
       # - task_5_up_tva_subtype_grading
       # - task_6_up_histo_grading
